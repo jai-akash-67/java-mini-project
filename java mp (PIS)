@@ -1,0 +1,206 @@
+from flask import Flask, render_template_string, request, redirect, url_for, flash
+import sqlite3
+
+app = Flask(_name_)
+app.secret_key = "your_secret_key"  # For session management and flashing messages
+
+# Function to initialize the SQLite database
+def init_db():
+    conn = sqlite3.connect('personal_info.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS persons (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        age INTEGER NOT NULL,
+                        email TEXT NOT NULL,
+                        phone TEXT NOT NULL
+                    )''')
+    conn.commit()
+    conn.close()
+
+# Homepage route
+@app.route('/')
+def index():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Personal Information System</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                padding: 50px;
+                text-align: center;
+            }
+            h1 {
+                color: #333;
+            }
+            .container {
+                background-color: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            a {
+                display: inline-block;
+                margin-top: 20px;
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 4px;
+                text-decoration: none;
+            }
+            a:hover {
+                background-color: #45a049;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Welcome to the Personal Information System</h1>
+            <h3>Done By:<br> Jai Akash </h3>
+            <a href="{{ url_for('dashboard') }}">Go to Dashboard</a>
+        </div>
+    </body>
+    </html>
+    ''')
+
+# Dashboard route
+@app.route('/dashboard', methods=['GET', 'POST'])
+def dashboard():
+    if request.method == 'POST':
+        name = request.form['name']
+        age = request.form['age']
+        email = request.form['email']
+        phone = request.form['phone']
+
+        # Insert person data into the database
+        conn = sqlite3.connect('personal_info.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO persons (name, age, email, phone) VALUES (?, ?, ?, ?)", 
+                       (name, int(age), email, phone))
+        conn.commit()
+        conn.close()
+        flash('Personal information added successfully!')
+        return redirect(url_for('dashboard'))
+
+    # Fetch all persons
+    conn = sqlite3.connect('personal_info.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM persons")
+    persons = cursor.fetchall()
+    conn.close()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard - Personal Information</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                padding: 50px;
+                text-align: center;
+            }
+            .container {
+                background-color: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            table, th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            form input, form button {
+                padding: 10px;
+                margin: 5px;
+                border-radius: 4px;
+            }
+            .flash {
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px;
+                margin: 20px 0;
+                border-radius: 4px;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Personal Information Dashboard</h1>
+            <form method="POST">
+                <input type="text" name="name" placeholder="Enter Name" required>
+                <input type="number" name="age" placeholder="Enter Age" required>
+                <input type="email" name="email" placeholder="Enter Email" required>
+                <input type="text" name="phone" placeholder="Enter Phone Number" required>
+                <button type="submit">Add Person</button>
+            </form>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash">{{ messages[0] }}</div>
+                {% endif %}
+            {% endwith %}
+            
+            <h2>Personal Information List</h2>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Action</th>
+                </tr>
+                {% for person in persons %}
+                <tr>
+                    <td>{{ person[0] }}</td>
+                    <td>{{ person[1] }}</td>
+                    <td>{{ person[2] }}</td>
+                    <td>{{ person[3] }}</td>
+                    <td>{{ person[4] }}</td>
+                    <td>
+                        <form action="{{ url_for('delete_person', person_id=person[0]) }}" method="POST">
+                            <button type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </body>
+    </html>
+    ''', persons=persons)
+
+# Route to delete a person
+@app.route('/delete/<int:person_id>', methods=['POST'])
+def delete_person(person_id):
+    conn = sqlite3.connect('personal_info.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM persons WHERE id = ?", (person_id,))
+    conn.commit()
+    conn.close()
+    flash('Personal information deleted successfully!')
+    return redirect(url_for('dashboard'))
+
+# Run the application
+if _name_ == '_main_':
+    init_db()  # Initialize the database
+    app.run(debug=True)
